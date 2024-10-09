@@ -20,7 +20,7 @@ class EMGControlSystem(QDialog):
         }
 
         self.board_type = self.opciones_placas.get(placa)
-
+        self.datos = np.zeros(2000)
         # Variables de control
         self.emg_channel = emg_channel  # Canal único de EMG
         self.t_lenght = t_lenght  # Duración temporal para visualización
@@ -102,9 +102,34 @@ class EMGControlSystem(QDialog):
 
     # Función para actualizar la gráfica con datos EMG filtrados
     def update_plot(self):
-        data = self.board.get_board_data(500)
+        sample_rate = 200  # Tasa de muestreo en Hz (ajusta esto según la configuración de tu dispositivo)
+        window_time = 5  # Tiempo de la ventana en segundos
+        buffer_size = sample_rate * window_time  # Cantidad de puntos para 5 segundos (1250 puntos si sample_rate es 250 Hz)
+        
+        data = self.board.get_board_data()  # Obtener los nuevos datos del board
         emg_signal = data[self.emg_channel, :]  # Obtener los datos del canal EMG
-        self.curve.setData(emg_signal)  # Actualizar la gráfica con la señal filtrada
+
+        # Si el buffer de datos aún no existe, lo inicializamos con ceros
+        if not hasattr(self, 'datos'):
+            self.datos = np.zeros(buffer_size)  # Inicializar buffer con ceros
+
+        # Asegurarse de que el tamaño de emg_signal sea menor o igual al tamaño del buffer
+        if emg_signal.shape[0] < buffer_size:
+            # Si los nuevos datos son menores que el buffer esperado, llenamos con ceros
+            padding = np.zeros(buffer_size - emg_signal.shape[0])  # Relleno de ceros
+            emg_signal = np.concatenate((emg_signal, padding))
+
+        # Actualizar el buffer de datos: Deslizar los datos antiguos hacia la izquierda
+        self.datos = np.roll(self.datos, -emg_signal.shape[0])  # Desplaza los datos hacia la izquierda
+        self.datos[-emg_signal.shape[0]:] = emg_signal  # Añadir los nuevos datos al final del buffer
+
+        # Actualizar la curva gráfica con los nuevos datos
+        self.curve.setData(self.datos)
+
+        # Opcional: puedes ajustar los ejes si es necesario
+        self.curve.setPos(len(self.datos) - buffer_size, 0)
+
+
         # # Filtrar la señal EMG
         # filtered_signal = self._filter_emg_signal(emg_signal)
 
