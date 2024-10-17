@@ -8,7 +8,6 @@ from PyQt5 import uic
 import pyqtgraph as pg
 from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds
 from scipy.signal import butter, filtfilt
-from PyQt5.QtCore import QTimer
 
 class EMGControlSystem(QDialog):
     def __init__(self, emg_channel, t_lenght=10, arduino_port='COM4', placa=3):
@@ -27,13 +26,11 @@ class EMGControlSystem(QDialog):
         self.arduino_port = arduino_port  # Puerto para Arduino
         self.threshold = 0.05  # Umbral para mover el servomotor
         self.board = self._setup_board()  # Inicializar la conexión con OpenBCI
-        self.fs = 250  # Frecuencia de muestreo (ajusta según tu dispositivo)
+        self.fs = 200  # Frecuencia de muestreo (ajusta según tu dispositivo)
         self.data = np.zeros(int(self.fs*5))
+        # Cargar la interfaz desde el archivo .ui
+        # ui_path = os.path.join(os.path.dirname(__file__), 'interfaz.ui')
         uic.loadUi('interfaz.ui', self)
-
-        # Crear el temporizador de actualización
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.update_plot)  # Conectar el temporizador con la función update_plot
 
         # Configurar la gráfica de tiempos
         self._init_ui()
@@ -92,11 +89,11 @@ class EMGControlSystem(QDialog):
     def _filter_emg_signal(self, emg_signal):
         # Definir un filtro Butterworth pasa-banda (20-500 Hz)
         lowcut = 20.0  # Frecuencia mínima (Hz)
-        highcut = 90.0  # Frecuencia máxima (Hz)
+        highcut = 500.0  # Frecuencia máxima (Hz)
         nyquist = 0.5 * self.fs
         low = lowcut / nyquist
         high = highcut / nyquist
-        b, a = butter(2, [low, high], btype='band')
+        b, a = butter(4, [low, high], btype='band')
 
         # Aplicar el filtro
         filtered_signal = filtfilt(b, a, emg_signal)
@@ -106,22 +103,27 @@ class EMGControlSystem(QDialog):
     def update_plot(self):
         data = self.board.get_board_data()  # Obtener los nuevos datos del board
         emg_signal = data[self.emg_channel, :]  # Obtener los datos del canal EMG
-        self.data = np.roll(self.data, -len(emg_signal))
-        self.data[-len(emg_signal):] = emg_signal
+        samples_remove = emg_signal.shape[0] #muestras a eliminar del buffer interno de datos
+        if samples_remove > 0:
+            ## giro el buffer interno de datos
+            self.data = np.roll(self.data, -samples_remove)
+            ## reemplazo los ultimos datos del buffer interno con newData
+            
+            self.data[-samples_remove:] = emg_signal
 
-        if len(self.data) > 16:
-            # Filtrar la señal EMG
-            filtered_signal = self._filter_emg_signal(self.data)
-            # Actualizar la curva gráfica con los nuevos datos
-            self.curve.setData(filtered_signal)
-           
-            # Procesar la señal filtrada (por ejemplo, RMS)
-            rms_value = self._emg_feature_extraction(filtered_signal)
-            print(rms_value)
+        # Actualizar la curva gráfica con los nuevos datos
+            self.curve.setData(self.data)
+
+        # # Filtrar la señal EMG
+        # filtered_signal = self._filter_emg_signal(emg_signal)
+
+        # # Procesar la señal filtrada (por ejemplo, RMS)
+        # rms_value = self._emg_feature_extraction(filtered_signal)
+        # self.curve.setData(filtered_signal)  # Actualizar la gráfica con la señal filtrada
         
 
-            # # Controlar el servomotor basado en el umbral del EMG
-            # self._control_servo(rms_value)
+        # # Controlar el servomotor basado en el umbral del EMG
+        # self._control_servo(rms_value)
 
     # Función para calcular el RMS de la señal EMG
     def _emg_feature_extraction(self, emg_signal):
@@ -149,10 +151,10 @@ if __name__ == "__main__":
 
     # Crea una instancia del sistema de control de EMG con el canal 1
     emg_system = EMGControlSystem(emg_channel=10)
-    emg_system.timer.start(30)  # Iniciar el temporizador con el intervalo calculado
 
     # Simula actualización continua de la gráfica y control
     while True:
+        emg_system.update_plot()
         app.processEvents()  # Permite que la UI se actualice en tiempo real
 
     sys.exit(app.exec_())
