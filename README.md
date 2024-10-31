@@ -15,7 +15,9 @@ Git
 Hacer una copia de este repositorio en su PC
 
 ## Paso 2 
-Instala el .yml para crear un entorno con las librerías necesarias en Python
+Instala el .yml para crear un entorno con las librerías necesarias en Python. Correr en consola conda:
+conda env create -f dependencias.yml
 
 ## Paso 3
-Abrir el directorio del repositorio en Visual y correr el script codigo.py
+Abrir el directorio del repositorio en Visual y correr el script codigo.py.
+Nota: seleccione el entorno llamado "emg" previo a correr el script
