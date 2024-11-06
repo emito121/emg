@@ -29,7 +29,9 @@ class EMGControlSystem(QDialog):
         uic.loadUi('interfaz.ui', self)
         # Crear el temporizador de actualización
         self.timer = QTimer()
+        self.timer_promedio = QTimer()
         self.timer.timeout.connect(self.update_plot)
+        self.timer_promedio.timeout.connect(self.mean_emg)
 
         # Inicializar OpenBCI y la interfaz gráfica
         self.board = self._setup_board()
@@ -56,7 +58,7 @@ class EMGControlSystem(QDialog):
         self._init_timeseries()
 
         # Iniciar el temporizador
-        self.timer.start(50)  # Puedes ajustar el intervalo aquí
+        
 
     # Inicializar la gráfica de la serie temporal
     def _init_timeseries(self):
@@ -68,7 +70,8 @@ class EMGControlSystem(QDialog):
         ax0 = self.plot.getAxis('left')
         ax0.setStyle(showValues=True)
         ax0.setLabel(f"Canal {self.emg_channel}", color='r', size='14pt', bold=True)
-        self.plot.setYRange(-100, 100)  # Rango fijo en el eje Y
+        self.plot.setYRange(-1000, 1000)  # Rango fijo en el eje Y
+        self.plot.setXRange(0,self.fs*self.t_lenght)
         ax1 = self.plot.getAxis('bottom')
         ax1.setStyle(showValues=True)
         ax1.setTickFont(QFont('Arial', 8))
@@ -98,28 +101,37 @@ class EMGControlSystem(QDialog):
         return filtered_signal
 
     def update_plot(self):
-        data = self.board.get_board_data()  # Obtener los nuevos datos del board
+        try:
+            data = self.board.get_current_board_data(self.fs*self.t_lenght)  # Obtener los nuevos datos del board
+            # print(data)
 
-        emg_signal = data[self.emg_channel, :]
-        emg_signal = np.where((emg_signal < -self.threshold_emg) | (emg_signal > self.threshold_emg), 0, emg_signal)
+            emg_signal = data[self.emg_channel, :]
+            print(self.fs*self.t_lenght)
+            # emg_signal = np.where((emg_signal < -self.threshold_emg) | (emg_signal > self.threshold_emg), 0, emg_signal)
 
-        self.data = np.roll(self.data, -len(emg_signal))
-        self.data[-len(emg_signal):] = emg_signal
-
-        if len(self.data) >= 16:
-            filtered_signal = self._filter_emg_signal(self.data)
+            filtered_signal = self._filter_emg_signal(emg_signal)
             self.curve.setData(filtered_signal)
 
-        if not hasattr(self, 'buffer'):
-            self.buffer = []
+            # if not hasattr(self, 'buffer'):
+            #     self.buffer = []
 
-        self.buffer.extend(emg_signal)
+            # self.buffer.extend(emg_signal)
 
-        if len(self.buffer) >= 200:
-            average_value = np.mean(self.buffer)
+            # if len(self.buffer) >= 200:
+            # average_value = np.mean(filtered_signal)
             # print(self.buffer)
-            print("Promedio de las últimas 200 muestras:", average_value)
-            self.buffer = []
+            # print("Promedio de las últimas 200 muestras:", average_value)
+            # self.buffer = []
+        except:
+            pass
+
+    def mean_emg(self):
+        try:
+            data = self.board.get_current_board_data(self.fs)
+            average_value = np.mean(data[self.emg_channel,:])
+            print(average_value)
+        except:
+            pass
 
     def closeEvent(self, event):
         self.board.stop_stream()
@@ -134,5 +146,8 @@ class EMGControlSystem(QDialog):
 if __name__ == "__main__":
     import sys
     app = QApplication(sys.argv)
-    emg_system = EMGControlSystem(emg_channel=0, placa=2, t_lenght=2, threshold_emg=250, placa_port='COM6')
+    emg_system = EMGControlSystem(emg_channel=1, placa=3, t_lenght=2, threshold_emg=250, placa_port='COM6')
+    # time.sleep(emg_system.t_lenght+1)
+    emg_system.timer.start(50)  # Puedes ajustar el intervalo aquí
+    emg_system.timer_promedio.start(1000)  # Puedes ajustar el intervalo aquí
     sys.exit(app.exec_())
