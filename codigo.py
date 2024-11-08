@@ -16,7 +16,7 @@ class EMGControlSystem(QDialog):
         self.opciones_placas = {
             1: [BoardIds.CYTON_BOARD, 250],
             2: [BoardIds.GANGLION_BOARD, 200],
-            3: [BoardIds.SYNTHETIC_BOARD, 250]
+            3: [BoardIds.SYNTHETIC_BOARD, 200]
         }
         self.placa_port = placa_port
         self.board_type = self.opciones_placas.get(placa)[0]
@@ -25,7 +25,6 @@ class EMGControlSystem(QDialog):
         self.arduino_port = arduino_port
         self.threshold_emg = threshold_emg
         self.fs = self.opciones_placas.get(placa)[1]
-        self.data = np.zeros(int(self.fs * t_lenght))
         uic.loadUi('interfaz.ui', self)
         # Crear el temporizador de actualización
         self.timer = QTimer()
@@ -103,25 +102,10 @@ class EMGControlSystem(QDialog):
     def update_plot(self):
         try:
             data = self.board.get_current_board_data(self.fs*self.t_lenght)  # Obtener los nuevos datos del board
-            # print(data)
-
             emg_signal = data[self.emg_channel, :]
-            print(self.fs*self.t_lenght)
             # emg_signal = np.where((emg_signal < -self.threshold_emg) | (emg_signal > self.threshold_emg), 0, emg_signal)
-
             filtered_signal = self._filter_emg_signal(emg_signal)
             self.curve.setData(filtered_signal)
-
-            # if not hasattr(self, 'buffer'):
-            #     self.buffer = []
-
-            # self.buffer.extend(emg_signal)
-
-            # if len(self.buffer) >= 200:
-            # average_value = np.mean(filtered_signal)
-            # print(self.buffer)
-            # print("Promedio de las últimas 200 muestras:", average_value)
-            # self.buffer = []
         except:
             pass
 
@@ -147,7 +131,6 @@ if __name__ == "__main__":
     import sys
     app = QApplication(sys.argv)
     emg_system = EMGControlSystem(emg_channel=1, placa=3, t_lenght=2, threshold_emg=250, placa_port='COM6')
-    # time.sleep(emg_system.t_lenght+1)
     emg_system.timer.start(50)  # Puedes ajustar el intervalo aquí
-    emg_system.timer_promedio.start(1000)  # Puedes ajustar el intervalo aquí
+    emg_system.timer_promedio.start(1500)  # Puedes ajustar el intervalo aquí
     sys.exit(app.exec_())
