@@ -10,7 +10,7 @@ from scipy.signal import butter, filtfilt, iirnotch
 from PyQt5 import uic
 
 class EMGControlSystem(QDialog):
-    def __init__(self, emg_channel, t_lenght=10, arduino_port='COM4', threshold_emg=100, placa=3, placa_port='COM6'):
+    def __init__(self, emg_channel, t_lenght=10, arduino_port='COM4', threshold_emg=100, placa=3, placa_port='COM6', arduino = False):
         super().__init__()
 
         self.opciones_placas = {
@@ -26,7 +26,14 @@ class EMGControlSystem(QDialog):
         self.arduino_port = arduino_port
         self.threshold_emg = threshold_emg
         self.fs = self.opciones_placas.get(placa)[1]
-        # self.data = np.zeros(int(self.fs * t_lenght))
+        
+        # Configurar arduino si se utiliza
+        self.arduino = arduino
+        if self.arduino:
+            self.arduino_port = arduino_port
+            self._init_serial()  # Conectar con Arduino
+
+        #Asociar la interfaz gráfica
         uic.loadUi('interfaz.ui', self)
         # Crear el temporizador de actualización
         self.timer = QTimer()
@@ -56,9 +63,6 @@ class EMGControlSystem(QDialog):
         self.graphics_window.setBackground('w')
         scene.addWidget(self.graphics_window)
         self._init_timeseries()
-
-        # Iniciar el temporizador
-        
 
     # Inicializar la gráfica de la serie temporal
     def _init_timeseries(self):
@@ -96,29 +100,26 @@ class EMGControlSystem(QDialog):
         notch_freq = 50.0
         quality_factor = 30
         b_notch, a_notch = iirnotch(notch_freq / nyquist, quality_factor)
-        # filtered_signal = filtfilt(b_notch, a_notch, filtered_signal)
+        filtered_signal = filtfilt(b_notch, a_notch, filtered_signal)
 
         return filtered_signal
 
     def update_plot(self):
-        # try:
-        data = self.board.get_current_board_data(self.fs*self.t_lenght)  # Obtener los nuevos datos del board
-        # print(data)
+        data = self.board.get_current_board_data(self.fs*self.t_lenght) 
 
         emg_signal = data[self.emg_channel, :]
-        # print(emg_signal)
-        # emg_signal = np.where((emg_signal < -self.threshold_emg) | (emg_signal > self.threshold_emg), 0, emg_signal)
-
         filtered_signal = self._filter_emg_signal(emg_signal)
-        self.curve.setData(filtered_signal)
-        # except:
-        #     pass
+        self.curve.setData(filtered_signal[150:-150])
 
     def mean_emg(self):
         try:
-            data = self.board.get_current_board_data(self.fs)
-            average_value = np.mean(data[self.emg_channel,:])
-            print(average_value)
+            data = self.board.get_current_board_data(self.fs*2)
+            data = data[self.emg_channel,:]
+            filer_data = self._filter_emg_signal(data)
+            average_value = np.sqrt(np.mean(filer_data[150:-150]**2))
+            print(f'RMS: ' + str(average_value))
+            if self.arduino:
+                self._control_servo(average_value)
         except:
             pass
 
@@ -131,11 +132,25 @@ class EMGControlSystem(QDialog):
         if event.key() == ord('Q'):
             self.close()
 
+    # Conectar con Arduino usando pySerial
+    def _init_serial(self):
+        self.arduino = serial.Serial(self.arduino_port, 9600)
+        time.sleep(2)  # Dar tiempo a la conexión para establecerse
+
+    def _control_servo(self, rms_value):
+        if rms_value > self.threshold_emg:
+            mensaje = 1 # Mover el servo a 90 grados
+        else:
+            mensaje = 0  # Retornar el servo a 0 grados
+
+        print("Envio a Arduino: " + str(mensaje))
+        self.arduino.write(f"{mensaje}\n".encode())
+
 # Ejemplo de ejecución
 if __name__ == "__main__":
     import sys
     app = QApplication(sys.argv)
-    emg_system = EMGControlSystem(emg_channel=0, placa=1, t_lenght=2, threshold_emg=1000, placa_port='COM4')
+    emg_system = EMGControlSystem(emg_channel=2, placa=1, t_lenght=2, threshold_emg=35, placa_port='COM4', arduino_port='COM6', arduino = False)
     emg_system.timer.start(50)  # Puedes ajustar el intervalo aquí
     emg_system.timer_promedio.start(1000)  # Puedes ajustar el intervalo aquí
     sys.exit(app.exec_())
