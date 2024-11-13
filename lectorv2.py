@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import time
+from scipy.signal import butter, filtfilt, iirnotch
 from PyQt5.QtWidgets import QDialog, QGraphicsScene, QApplication
 from PyQt5.QtGui import QFont, QKeyEvent
 import pyqtgraph as pg
@@ -33,12 +34,9 @@ class EMGControlSystem(QDialog):
         self.mean.start(1000)
 
     def find_latest_file(self, pattern="*"):
-            # Encuentra todos los archivos que coincidan con el patrón en el directorio
             files = glob.glob(os.path.join(self.directorio, pattern))
             if not files:
-                return None  # No hay archivos que coincidan
-
-            # Ordena los archivos por fecha de modificación
+                return None
             latest_file = max(files, key=os.path.getmtime)
             self.path = latest_file
 
@@ -71,38 +69,52 @@ class EMGControlSystem(QDialog):
         self.plot.showAxis('bottom', True)
         self.curve = self.plot.plot(pen='r', name=f'Canal {self.emg_channel}')
 
+    def bandpass_filter(self, data, lowcut=5, highcut=120):
+        nyquist = 0.5 * self.fs
+        low = lowcut / nyquist
+        high = highcut / nyquist
+        b, a = butter(4, [low, high], btype="band")
+        return filtfilt(b, a, data)
+
+    def notch_filter(self, data, freq=50, quality=30):
+        nyquist = 0.5 * self.fs
+        notch_freq = freq / nyquist
+        b, a = iirnotch(notch_freq, quality)
+        return filtfilt(b, a, data)
+
     def update_plot(self):
         new_data = self.read_new_data()
         if new_data is not None:
-            # Limitar el tamaño de new_data al tamaño del buffer, si es mayor
             if len(new_data) > len(self.data_buffer):
-                new_data = new_data[-len(self.data_buffer):]  # Solo los últimos datos que caben en el buffer
+                new_data = new_data[-len(self.data_buffer):]
 
-            # Actualizar el búfer desplazando los datos anteriores
             self.data_buffer = np.roll(self.data_buffer, -len(new_data))
             self.data_buffer[-len(new_data):] = new_data
 
-            # Actualizar la curva de la gráfica
-            self.curve.setData(self.data_buffer)
+            # Aplicar filtros pasa-banda y notch
+            filtered_data = self.bandpass_filter(self.data_buffer)
+            filtered_data = self.notch_filter(filtered_data)
 
-    def mean_emg(self):
+            self.curve.setData(filtered_data)
+
+    def mean_emg(self,):
         try:
-            data = self.data_buffer[-int(self.fs):]
-            average_value = np.mean(data)
+            data = self.data_buffer[-int(self.fs)*3:]
+            filtered_data = self.bandpass_filter(data)
+            filtered_data = self.notch_filter(filtered_data)
+            average_value = np.mean(filtered_data)
             print(average_value)
         except:
             pass
 
     def read_new_data(self):
-        # Leer el archivo completo y obtener solo las nuevas filas
         data = pd.read_csv(self.path, sep='\t', header=None)
         total_rows = len(data)
         
         if total_rows > self.last_row_read:
-            # Extraer las nuevas filas y obtener el canal específico
             new_data = data.iloc[self.last_row_read:total_rows, self.emg_channel]
             self.last_row_read = total_rows
-            return new_data.values  # Convertir a array de numpy para manejarlo en el búfer
+            return new_data.values
         return None
 
     def closeEvent(self, event):
@@ -117,5 +129,5 @@ if __name__ == "__main__":
     import sys
     app = QApplication(sys.argv)
     file_path = "C:/Users/Usuario/Documents/OpenBCI_GUI/Recordings/OpenBCISession_2024-11-12_23-09-40/"
-    emg_system = EMGControlSystem(emg_channel=1, t_length=2, directorio=file_path)
+    emg_system = EMGControlSystem(emg_channel=3, t_length=2, directorio=file_path)
     sys.exit(app.exec_())
