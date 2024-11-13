@@ -10,7 +10,7 @@ from scipy.signal import butter, filtfilt, iirnotch
 from PyQt5 import uic
 
 class EMGControlSystem(QDialog):
-    def __init__(self, emg_channel, t_lenght=10, arduino_port='COM4', threshold_emg=100, placa=3, placa_port='COM6', arduino = False):
+    def __init__(self, emg_channel, t_lenght=10, arduino_port='COM4', threshold_emg=100, placa=3, placa_port='COM6', arduino_use = False):
         super().__init__()
 
         self.opciones_placas = {
@@ -28,8 +28,8 @@ class EMGControlSystem(QDialog):
         self.fs = self.opciones_placas.get(placa)[1]
         
         # Configurar arduino si se utiliza
-        self.arduino = arduino
-        if self.arduino:
+        self.arduino_use = arduino_use
+        if self.arduino_use:
             self.arduino_port = arduino_port
             self._init_serial()  # Conectar con Arduino
 
@@ -40,6 +40,8 @@ class EMGControlSystem(QDialog):
         self.timer_promedio = QTimer()
         self.timer.timeout.connect(self.update_plot)
         self.timer_promedio.timeout.connect(self.mean_emg)
+        
+        self.button_close.clicked.connect(self.closeEvent)
 
         # Inicializar OpenBCI y la interfaz gráfica
         self.board = self._setup_board()
@@ -74,8 +76,8 @@ class EMGControlSystem(QDialog):
         ax0 = self.plot.getAxis('left')
         ax0.setStyle(showValues=True)
         ax0.setLabel(f"Canal {self.emg_channel}", color='r', size='14pt', bold=True)
-        self.plot.setYRange(-1000, 1000)  # Rango fijo en el eje Y
-        self.plot.setXRange(0,self.fs*self.t_lenght)
+        self.plot.setYRange(-100, 100)  # Rango fijo en el eje Y
+        self.plot.setXRange(0,self.fs*self.t_lenght-300)
         ax1 = self.plot.getAxis('bottom')
         ax1.setStyle(showValues=True)
         ax1.setTickFont(QFont('Arial', 8))
@@ -117,20 +119,26 @@ class EMGControlSystem(QDialog):
             data = data[self.emg_channel,:]
             filer_data = self._filter_emg_signal(data)
             average_value = np.sqrt(np.mean(filer_data[150:-150]**2))
-            print(f'RMS: ' + str(average_value))
-            if self.arduino:
+            RMS = round(average_value, 2)
+            print('RMS: ' + str(RMS))
+            self.label_RMS.setText('RMS: ' + str(RMS))
+            if self.arduino_use:
                 self._control_servo(average_value)
         except:
             pass
 
-    def closeEvent(self, event):
+    def closeEvent(self):
         self.board.stop_stream()
         self.board.release_session()
-        event.accept()  # Aceptar el cierre de la ventana
+        self.close()
+        self.arduino.close()
+        self.closeEvent()
 
     def keyPressEvent(self, event: QKeyEvent):
         if event.key() == ord('Q'):
             self.close()
+            self.arduino.close()
+            self.closeEvent()
 
     # Conectar con Arduino usando pySerial
     def _init_serial(self):
@@ -139,9 +147,11 @@ class EMGControlSystem(QDialog):
 
     def _control_servo(self, rms_value):
         if rms_value > self.threshold_emg:
-            mensaje = 1 # Mover el servo a 90 grados
+            mensaje = '1' # Mover el servo
+            self.label_Arduino.setText('Enviado a Arduino: ' + mensaje)
         else:
-            mensaje = 0  # Retornar el servo a 0 grados
+            mensaje = '0'  # Retornar el servo a 0 grados
+            self.label_Arduino.setText('Enviado a Arduino: ' + mensaje)
 
         print("Envio a Arduino: " + str(mensaje))
         self.arduino.write(f"{mensaje}\n".encode())
@@ -150,7 +160,7 @@ class EMGControlSystem(QDialog):
 if __name__ == "__main__":
     import sys
     app = QApplication(sys.argv)
-    emg_system = EMGControlSystem(emg_channel=2, placa=1, t_lenght=2, threshold_emg=35, placa_port='COM4', arduino_port='COM6', arduino = False)
+    emg_system = EMGControlSystem(emg_channel=1, placa=3, t_lenght=5, threshold_emg=3, placa_port='COM4', arduino_port='COM3', arduino_use = True)
     emg_system.timer.start(50)  # Puedes ajustar el intervalo aquí
     emg_system.timer_promedio.start(1000)  # Puedes ajustar el intervalo aquí
     sys.exit(app.exec_())
