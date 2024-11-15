@@ -111,14 +111,15 @@ class EMGControlSystem(QDialog):
 
         emg_signal = data[self.emg_channel, :]
         filtered_signal = self._filter_emg_signal(emg_signal)
-        self.curve.setData(filtered_signal[150:-150])
+        self.curve.setData(filtered_signal[150:-100])
+        # self.curve.setData(filtered_signal)
 
     def mean_emg(self):
         try:
             data = self.board.get_current_board_data(self.fs*2)
             data = data[self.emg_channel,:]
             filer_data = self._filter_emg_signal(data)
-            average_value = np.sqrt(np.mean(filer_data[150:-150]**2))
+            average_value = np.sqrt(np.mean(filer_data[350:-100]**2))
             RMS = round(average_value, 2)
             print('RMS: ' + str(RMS))
             self.label_RMS.setText('RMS: ' + str(RMS))
@@ -131,7 +132,9 @@ class EMGControlSystem(QDialog):
         self.board.stop_stream()
         self.board.release_session()
         self.close()
-        self.arduino.close()
+        if self.arduino_use:
+            self.arduino.write(f"0\n".encode())
+            self.arduino.close()
         self.closeEvent()
 
     def keyPressEvent(self, event: QKeyEvent):
@@ -160,7 +163,7 @@ class EMGControlSystem(QDialog):
 if __name__ == "__main__":
     import sys
     app = QApplication(sys.argv)
-    emg_system = EMGControlSystem(emg_channel=1, placa=3, t_lenght=5, threshold_emg=3, placa_port='COM4', arduino_port='COM3', arduino_use = True)
+    emg_system = EMGControlSystem(emg_channel=1, placa=1, t_lenght=5, threshold_emg=35, placa_port='COM4', arduino_port='COM8', arduino_use = True)
     emg_system.timer.start(50)  # Puedes ajustar el intervalo aquí
-    emg_system.timer_promedio.start(1000)  # Puedes ajustar el intervalo aquí
+    emg_system.timer_promedio.start(100)  # Puedes ajustar el intervalo aquí
     sys.exit(app.exec_())
