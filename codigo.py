@@ -25,6 +25,7 @@ class EMGControlSystem(QDialog):
         self.t_lenght = t_lenght
         self.arduino_port = arduino_port
         self.threshold_emg = threshold_emg
+        
         self.fs = self.opciones_placas.get(placa)[1]
         
         # Configurar arduino si se utiliza
@@ -35,6 +36,8 @@ class EMGControlSystem(QDialog):
 
         #Asociar la interfaz gráfica
         uic.loadUi('interfaz.ui', self)
+        self.label_umbral.setText('Umbral Seleccionado: ' + str(self.threshold_emg))
+        self.button_umbral.clicked.connect(self.cambiar_umbral)
         # Crear el temporizador de actualización
         self.timer = QTimer()
         self.timer_promedio = QTimer()
@@ -47,6 +50,13 @@ class EMGControlSystem(QDialog):
         self.board = self._setup_board()
         self._init_ui()
         self.show()
+
+    def cambiar_umbral(self):
+        try:
+            self.threshold_emg = float(self.line_umbral.text())
+            self.label_umbral.setText('Umbral Seleccionado: ' + str(self.threshold_emg))
+        except:
+            pass
 
     # Inicializar OpenBCI y Brainflow
     def _setup_board(self):
@@ -111,7 +121,7 @@ class EMGControlSystem(QDialog):
 
         emg_signal = data[self.emg_channel, :]
         filtered_signal = self._filter_emg_signal(emg_signal)
-        self.curve.setData(filtered_signal[150:-100])
+        self.curve.setData(filtered_signal[150:-150])
         # self.curve.setData(filtered_signal)
 
     def mean_emg(self):
@@ -119,7 +129,7 @@ class EMGControlSystem(QDialog):
             data = self.board.get_current_board_data(self.fs*2)
             data = data[self.emg_channel,:]
             filer_data = self._filter_emg_signal(data)
-            average_value = np.sqrt(np.mean(filer_data[350:-100]**2))
+            average_value = np.sqrt(np.mean(filer_data[300:-150]**2))
             RMS = round(average_value, 2)
             print('RMS: ' + str(RMS))
             self.label_RMS.setText('RMS: ' + str(RMS))
@@ -163,7 +173,7 @@ class EMGControlSystem(QDialog):
 if __name__ == "__main__":
     import sys
     app = QApplication(sys.argv)
-    emg_system = EMGControlSystem(emg_channel=1, placa=1, t_lenght=5, threshold_emg=35, placa_port='COM4', arduino_port='COM8', arduino_use = True)
+    emg_system = EMGControlSystem(emg_channel=1, placa=1, t_lenght=5, threshold_emg=5, placa_port='COM4', arduino_port='COM8', arduino_use = True)
     emg_system.timer.start(50)  # Puedes ajustar el intervalo aquí
-    emg_system.timer_promedio.start(100)  # Puedes ajustar el intervalo aquí
+    emg_system.timer_promedio.start(200)  # Puedes ajustar el intervalo aquí
     sys.exit(app.exec_())

@@ -87,13 +87,13 @@
     <string>Cerrar</string>
    </property>
   </widget>
-  <widget class="QWidget" name="">
+  <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
      <x>20</x>
      <y>510</y>
      <width>331</width>
-     <height>81</height>
+     <height>83</height>
     </rect>
    </property>
    <layout class="QVBoxLayout" name="verticalLayout">
@@ -124,6 +124,60 @@
       </property>
       <property name="text">
        <string>Enviado a Arduino: </string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="label_umbral">
+      <property name="font">
+       <font>
+        <family>Verdana</family>
+        <pointsize>14</pointsize>
+        <weight>75</weight>
+        <bold>true</bold>
+       </font>
+      </property>
+      <property name="text">
+       <string>Umbral Seleccionado:</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QWidget" name="">
+   <property name="geometry">
+    <rect>
+     <x>360</x>
+     <y>570</y>
+     <width>265</width>
+     <height>27</height>
+    </rect>
+   </property>
+   <layout class="QHBoxLayout" name="horizontalLayout">
+    <item>
+     <widget class="QLineEdit" name="line_umbral">
+      <property name="font">
+       <font>
+        <pointsize>12</pointsize>
+       </font>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="button_umbral">
+      <property name="font">
+       <font>
+        <family>Verdana</family>
+        <pointsize>10</pointsize>
+        <weight>75</weight>
+        <bold>true</bold>
+       </font>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">background-color: rgb(255, 255, 0);</string>
+      </property>
+      <property name="text">
+       <string>Cambiar umbral</string>
       </property>
      </widget>
     </item>
